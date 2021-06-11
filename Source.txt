@@ -1,0 +1,573 @@
+settings
+{
+	lobby
+	{
+		Allow Players Who Are In Queue: Yes
+		Max FFA Players: 8
+	}
+
+	modes
+	{
+		Deathmatch
+		{
+			Game Length In Minutes: 15
+
+			disabled maps
+			{
+				Kanezaka
+				Workshop Expanse Night
+				Workshop Green Screen
+				Workshop Island Night
+			}
+		}
+
+		General
+		{
+			Allow Hero Switching: Off
+			Enemy Health Bars: Off
+			Game Mode Start: Immediately
+			Limit Roles: 2 Of Each Role Per Team
+			Respawn As Random Hero: On
+			Spawn Health Packs: Enabled
+		}
+	}
+}
+
+variables
+{
+	global:
+		0: HeroArray
+
+	player:
+		0: HealthRemaining
+		1: UltChargeRemaining
+		2: UltDurationTimer
+		3: StaggerTimer
+		4: MeleeTimeHeld
+		5: DeathsOnHero
+		6: EchoHelpStack
+		7: EchoHelpEnabled
+}
+
+subroutines
+{
+	0: UltTimerSetter
+	1: ResetPlayer
+}
+
+rule("PrepareHeroArray")
+{
+	event
+	{
+		Ongoing - Global;
+	}
+
+	actions
+	{
+		Global.HeroArray = Empty Array;
+		"1"
+		Modify Global Variable(HeroArray, Append To Array, Hero(Reinhardt));
+		"2"
+		Modify Global Variable(HeroArray, Append To Array, Hero(Roadhog));
+		"3"
+		Modify Global Variable(HeroArray, Append To Array, Hero(Orisa));
+		"4"
+		Modify Global Variable(HeroArray, Append To Array, Hero(Doomfist));
+		"5"
+		Modify Global Variable(HeroArray, Append To Array, Hero(Winston));
+		"6"
+		Modify Global Variable(HeroArray, Append To Array, Hero(D.Va));
+		"7"
+		Modify Global Variable(HeroArray, Append To Array, Hero(Wrecking Ball));
+		"8"
+		Modify Global Variable(HeroArray, Append To Array, Hero(Junkrat));
+		"9"
+		Modify Global Variable(HeroArray, Append To Array, Hero(Ana));
+		"10"
+		Modify Global Variable(HeroArray, Append To Array, Hero(Soldier: 76));
+		"11"
+		Modify Global Variable(HeroArray, Append To Array, Hero(Mei));
+		"12"
+		Modify Global Variable(HeroArray, Append To Array, Hero(McCree));
+		"13"
+		Modify Global Variable(HeroArray, Append To Array, Hero(Reaper));
+		"14"
+		Modify Global Variable(HeroArray, Append To Array, Hero(Bastion));
+		"15"
+		Modify Global Variable(HeroArray, Append To Array, Hero(Ashe));
+		"16"
+		Modify Global Variable(HeroArray, Append To Array, Hero(Sombra));
+		"17"
+		Modify Global Variable(HeroArray, Append To Array, Hero(Genji));
+		"18"
+		Modify Global Variable(HeroArray, Append To Array, Hero(Pharah));
+		"18"
+		disabled Modify Global Variable(HeroArray, Append To Array, Hero(Echo));
+		"19"
+		Modify Global Variable(HeroArray, Append To Array, Hero(Sigma));
+		"20"
+		Modify Global Variable(HeroArray, Append To Array, Hero(Zarya));
+		"21"
+		Modify Global Variable(HeroArray, Append To Array, Hero(Hanzo));
+		"22"
+		Modify Global Variable(HeroArray, Append To Array, Hero(Widowmaker));
+		"23"
+		Modify Global Variable(HeroArray, Append To Array, Hero(Zenyatta));
+		"24"
+		Modify Global Variable(HeroArray, Append To Array, Hero(Baptiste));
+		"25"
+		Modify Global Variable(HeroArray, Append To Array, Hero(Moira));
+		"26"
+		Modify Global Variable(HeroArray, Append To Array, Hero(Torbjörn));
+		"27"
+		Modify Global Variable(HeroArray, Append To Array, Hero(Symmetra));
+		"28"
+		Modify Global Variable(HeroArray, Append To Array, Hero(Brigitte));
+		"29"
+		Modify Global Variable(HeroArray, Append To Array, Hero(Lúcio));
+		"30"
+		Modify Global Variable(HeroArray, Append To Array, Hero(Tracer));
+		"31"
+		Modify Global Variable(HeroArray, Append To Array, Hero(Mercy));
+	}
+}
+
+rule("InitialiseServer")
+{
+	event
+	{
+		Ongoing - Global;
+	}
+
+	conditions
+	{
+		Is Game In Progress == True;
+	}
+
+	actions
+	{
+		Disable Built-In Game Mode Music;
+		Disable Built-In Game Mode Announcer;
+		Disable Built-In Game Mode Completion;
+		Disable Built-In Game Mode Scoring;
+		Pause Match Time;
+		Create HUD Text(Filtered Array(All Living Players(All Teams), Is Using Ultimate(Current Array Element)
+			== True || Current Array Element.UltDurationTimer > 0 || Current Array Element.StaggerTimer > 0), Custom String(
+			"Character Locked!"), Null, Null, Top, 0, Color(Red), Color(Red), Color(Red), Visible To and String, Default Visibility);
+		Create HUD Text(Filtered Array(All Living Players(All Teams),
+			Current Array Element.EchoHelpStack > 0 && Current Array Element.EchoHelpEnabled == False), Custom String(
+			"Echo's Helper Ready {0}", Hero Icon String(Hero(Echo))), Null, Custom String("Press Interact to change into Echo!"), Top, 0,
+			Color(Turquoise), Color(Turquoise), Color(Turquoise), Visible To and String, Default Visibility);
+	}
+}
+
+rule("ForceHeroSpawn")
+{
+	event
+	{
+		Ongoing - Each Player;
+		All;
+		All;
+	}
+
+	conditions
+	{
+		Hero Of(Event Player) != Global.HeroArray[Score Of(Event Player)];
+		Is Using Ultimate(Event Player) == False;
+		Is Alive(Event Player) == True;
+		Is Button Held(Event Player, Button(Interact)) == False;
+		Event Player.UltDurationTimer <= 0;
+		Event Player.StaggerTimer <= 0;
+		Event Player.EchoHelpEnabled == False;
+	}
+
+	actions
+	{
+		Preload Hero(Event Player, Global.HeroArray[Score Of(Event Player)]);
+		Skip If(Event Player.HealthRemaining != 0, 1);
+		Event Player.HealthRemaining = Normalized Health(Event Player);
+		Skip If(Event Player.UltChargeRemaining != 0, 1);
+		Event Player.UltChargeRemaining = Ultimate Charge Percent(Event Player);
+		Start Forcing Player To Be Hero(Event Player, Global.HeroArray[Score Of(Event Player)]);
+		Set Ultimate Charge(Event Player, Event Player.UltChargeRemaining);
+		Set Status(Event Player, Null, Unkillable, 1);
+		Wait(1, Ignore Condition);
+		Damage(Event Player, Null, Max Health(Event Player) - Max Health(Event Player) * Event Player.HealthRemaining);
+		Event Player.HealthRemaining = 0;
+		Event Player.UltChargeRemaining = 0;
+		Event Player.DeathsOnHero = 0;
+	}
+}
+
+rule("ScoreWinEvent")
+{
+	event
+	{
+		Ongoing - Each Player;
+		All;
+		All;
+	}
+
+	conditions
+	{
+		Score Of(Event Player) >= Count Of(Global.HeroArray);
+		Is Game In Progress == True;
+	}
+
+	actions
+	{
+		Declare Player Victory(Event Player);
+	}
+}
+
+disabled rule("debug")
+{
+	event
+	{
+		Ongoing - Each Player;
+		All;
+		All;
+	}
+
+	conditions
+	{
+		Is Button Held(Event Player, Button(Crouch)) == True;
+	}
+
+	actions
+	{
+		Damage(Event Player, Null, Max Health(Event Player) * 0.500);
+		disabled Wait(1.250, Ignore Condition);
+		disabled Modify Player Score(Event Player, 1);
+		disabled Set Ultimate Charge(Event Player, 100);
+		disabled Event Player.StaggerTimer = 2;
+		Create Dummy Bot(Hero(Ana), All Teams, -1, Position Of(Event Player), Facing Direction Of(Event Player));
+	}
+}
+
+rule("UltTimerOverride")
+{
+	event
+	{
+		Subroutine;
+		UltTimerSetter;
+	}
+
+	actions
+	{
+		If(Hero Of(Event Player) == Hero(Wrecking Ball));
+			Event Player.UltDurationTimer = 20;
+		Else If(Hero Of(Event Player) == Hero(Hanzo));
+			Event Player.UltDurationTimer = 12;
+		Else If(Hero Of(Event Player) == Hero(Torbjörn));
+			Event Player.UltDurationTimer = 13;
+		Else If(Hero Of(Event Player) == Hero(Tracer));
+			Event Player.UltDurationTimer = 2;
+	}
+}
+
+rule("UltTimerTicker")
+{
+	event
+	{
+		Ongoing - Each Player;
+		All;
+		All;
+	}
+
+	conditions
+	{
+		Event Player.UltDurationTimer > 0;
+	}
+
+	actions
+	{
+		Wait(0.100, Abort When False);
+		Event Player.UltDurationTimer -= 0.100;
+		Loop If Condition Is True;
+	}
+}
+
+rule("StaggerTimerTicker")
+{
+	event
+	{
+		Ongoing - Each Player;
+		All;
+		All;
+	}
+
+	conditions
+	{
+		Event Player.StaggerTimer > 0;
+	}
+
+	actions
+	{
+		Wait(0.100, Abort When False);
+		Event Player.StaggerTimer -= 0.100;
+		Loop If Condition Is True;
+	}
+}
+
+rule("PlayerReset")
+{
+	event
+	{
+		Subroutine;
+		ResetPlayer;
+	}
+
+	actions
+	{
+		Event Player.HealthRemaining = 1;
+		Event Player.EchoHelpEnabled = False;
+	}
+}
+
+rule("UltimateEvent")
+{
+	event
+	{
+		Ongoing - Each Player;
+		All;
+		All;
+	}
+
+	conditions
+	{
+		Is Using Ultimate(Event Player) == True;
+	}
+
+	actions
+	{
+		Call Subroutine(UltTimerSetter);
+	}
+}
+
+rule("StaggerOnAttack")
+{
+	event
+	{
+		Player Took Damage;
+		All;
+		All;
+	}
+
+	conditions
+	{
+		Victim != Attacker;
+	}
+
+	actions
+	{
+		Event Player.StaggerTimer = 2;
+	}
+}
+
+rule("MeleeKillsReduceScore")
+{
+	event
+	{
+		Player Died;
+		All;
+		All;
+	}
+
+	conditions
+	{
+		Is Button Held(Attacker, Button(Melee)) == True;
+		Attacker.MeleeTimeHeld <= 0.001;
+	}
+
+	actions
+	{
+		Big Message(All Players(All Teams), Custom String("melee kill"));
+	}
+}
+
+rule("meleeTimertick")
+{
+	event
+	{
+		Ongoing - Each Player;
+		All;
+		All;
+	}
+
+	conditions
+	{
+		Is Button Held(Event Player, Button(Melee)) == True;
+		Event Player.MeleeTimeHeld <= 0.002;
+	}
+
+	actions
+	{
+		Wait(0.001, Abort When False);
+		Event Player.MeleeTimeHeld += 0.010;
+		Loop If Condition Is True;
+	}
+}
+
+rule("meleeTimerReset")
+{
+	event
+	{
+		Ongoing - Each Player;
+		All;
+		All;
+	}
+
+	conditions
+	{
+		Is Button Held(Event Player, Button(Melee)) == False;
+	}
+
+	actions
+	{
+		Event Player.MeleeTimeHeld = 0;
+	}
+}
+
+rule("EchoHelpCounter")
+{
+	event
+	{
+		Player Died;
+		All;
+		All;
+	}
+
+	actions
+	{
+		Event Player.DeathsOnHero += 1;
+		Abort If(Event Player.DeathsOnHero != 3);
+		Event Player.EchoHelpStack += 1;
+		Event Player.DeathsOnHero = 0;
+	}
+}
+
+rule("EchoHelperStart")
+{
+	event
+	{
+		Ongoing - Each Player;
+		All;
+		All;
+	}
+
+	conditions
+	{
+		Event Player.EchoHelpStack > 0;
+		Is Button Held(Event Player, Button(Interact)) == True;
+		Event Player.EchoHelpEnabled == False;
+		Health(Event Player) == Max Health(Event Player);
+	}
+
+	actions
+	{
+		Event Player.UltChargeRemaining = Ultimate Charge Percent(Event Player);
+		Event Player.EchoHelpEnabled = True;
+		Start Forcing Player To Be Hero(Event Player, Hero(Echo));
+		Set Ultimate Charge(Event Player, 0);
+		Big Message(All Players(All Teams), Custom String("Echo's Helper activated!"));
+		Event Player.EchoHelpStack -= 1;
+	}
+}
+
+rule("EchoHelperStartFail")
+{
+	event
+	{
+		Ongoing - Each Player;
+		All;
+		All;
+	}
+
+	conditions
+	{
+		Event Player.EchoHelpStack > 0;
+		Is Button Held(Event Player, Button(Interact)) == True;
+		Event Player.EchoHelpEnabled == False;
+		Health(Event Player) != Max Health(Event Player);
+	}
+
+	actions
+	{
+		Small Message(All Players(All Teams), Custom String("Echo's Helper can only be used at full health"));
+	}
+}
+
+rule("OnDeadEvent")
+{
+	event
+	{
+		Player Died;
+		All;
+		All;
+	}
+
+	actions
+	{
+		Call Subroutine(ResetPlayer);
+	}
+}
+
+rule("EchoExtraUltCharge")
+{
+	event
+	{
+		Player Dealt Damage;
+		All;
+		Echo;
+	}
+
+	conditions
+	{
+		Event Player.EchoHelpEnabled == True;
+	}
+
+	actions
+	{
+		Set Ultimate Charge(Event Player, Ultimate Charge Percent(Event Player) + 3);
+	}
+}
+
+rule("ScoreOnKill")
+{
+	event
+	{
+		Player Dealt Final Blow;
+		All;
+		All;
+	}
+
+	actions
+	{
+		If(Event Was Critical Hit);
+			Modify Player Score(Event Player, 3);
+		Else;
+			Modify Player Score(Event Player, 1);
+		End;
+	}
+}
+
+rule("Rule 21")
+{
+	event
+	{
+		Ongoing - Each Player;
+		All;
+		All;
+	}
+
+	conditions
+	{
+		Is Alive(Event Player) == True;
+	}
+
+	actions
+	{
+		Event Player.StaggerTimer = 0;
+	}
+}
